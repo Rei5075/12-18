@@ -12,6 +12,11 @@ import uvicorn  # HTMLを返すためのレスポンスクラス
 # FastAPIアプリケーションのインスタンスを作成
 app = FastAPI()
 
+class Question(BaseModel):
+    category: str
+    content: str
+    options: list
+    correct: int
 
 # corsを無効化（開発時のみ）
 app.add_middleware(
@@ -23,29 +28,44 @@ app.add_middleware(
 )
 
 
-# データベースの初期設定を行う関数
+# データベース初期化
 def init_db():
-    # SQLiteデータベースに接続（ファイルが存在しない場合は新規作成）
-    with sqlite3.connect("todos.db") as conn:
-        # TODOを保存するテーブルを作成（すでに存在する場合は作成しない）
-        # 自動増分する一意のID（INTEGER PRIMARY KEY AUTOINCREMENT）
-        # TODOのタイトル（TEXT NOT NULL）
-        # 完了状態（BOOLEAN DEFAULT FALSE）
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS todos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                completed BOOLEAN DEFAULT FALSE
-            )
-        """
+    conn = sqlite3.connect("todos.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT,
+            content TEXT,
+            options TEXT,
+            correct INTEGER
         )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
 
 
 # アプリケーション起動時にデータベースを初期化
 init_db()
 
 
+@app.post("/save-question")
+async def save_question(question: Question):
+    try:
+        conn = sqlite3.connect("todos.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO questions (category, content, options, correct) VALUES (?, ?, ?, ?)",
+            (question.category, question.content, ','.join(question.options), question.correct),
+        )
+        conn.commit()
+        conn.close()
+        return {"message": "Question saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 # リクエストボディのデータ構造を定義するクラス
 class Todo(BaseModel):
     title: str  # TODOのタイトル（必須）
@@ -65,7 +85,7 @@ def read_root():
 
 
 # 新規TODOを作成するエンドポイント
-@app.post("/todo-form", response_model=TodoResponse)
+@app.post("/save-question", response_model=TodoResponse)
 def create_todo(todo: Todo):
     with sqlite3.connect("todos.db") as conn:
         cursor = conn.execute(
@@ -78,7 +98,7 @@ def create_todo(todo: Todo):
 
 
 # 全てのTODOを取得するエンドポイント
-@app.get("/todo-form")
+@app.get("/save-question")
 def get_todos():
     with sqlite3.connect("todos.db") as conn:
         todos = conn.execute("SELECT * FROM todos").fetchall()  # 全てのTODOを取得
@@ -87,7 +107,7 @@ def get_todos():
 
 
 # 指定されたIDのTODOを取得するエンドポイント
-@app.get("/renderQuestions/{todo_id}")
+@app.get("/save-question/{todo_id}")
 def get_todo(todo_id: int):
     with sqlite3.connect("todos.db") as conn:
         # 指定されたIDのTODOを検索
@@ -98,7 +118,7 @@ def get_todo(todo_id: int):
 
 
 # 指定されたIDのTODOを更新するエンドポイント
-@app.put("/renderQuestions/{todo_id}")
+@app.put("/save-question/{todo_id}")
 def update_todo(todo_id: int, todo: Todo):
     with sqlite3.connect("todos.db") as conn:
         # タイトルと完了状態を更新
@@ -112,7 +132,7 @@ def update_todo(todo_id: int, todo: Todo):
 
 
 # 指定されたIDのTODOを削除するエンドポイント
-@app.delete("/renderQuestions/{todo_id}")
+@app.delete("/save-question/{todo_id}")
 def delete_todo(todo_id: int):
     with sqlite3.connect("todos.db") as conn:
         # 指定されたIDのTODOを削除

@@ -75,7 +75,7 @@
         <input type="text" id="option3" placeholder="選択肢3" required>
         <input type="text" id="option4" placeholder="選択肢4" required>
         <input type="number" id="correctAnswer" placeholder="正解番号 (1-4)" min="1" max="4" required>
-        <button onclick="addQuestion()">問題を追加</button>
+        <button type="submit">問題を追加</button>
     </div>
 
     <div class="search-bar">
@@ -106,6 +106,26 @@
             const question = { category, content, options, correct };
             questions.push(question);
             renderQuestions();
+
+            // サーバーへデータを送信
+        try {
+            const response = await fetch("http://localhost:8000/save-question", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(question),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log("サーバーに保存しました:", result);
+            } else {
+                console.error("サーバーでエラーが発生しました:", response.statusText);
+            }
+        } catch (error) {
+            console.error("通信エラー:", error);
+        }
 
             document.getElementById('questionCategory').value = '';
             document.getElementById('questionContent').value = '';
