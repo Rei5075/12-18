@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware  # CORSを有効にするた�
 from pydantic import BaseModel  # データのバリデーション（検証）を行うための基本クラス
 from typing import Optional  # 省略可能な項目を定義するために使用
 import sqlite3  # SQLiteデータベースを使用するためのライブラリ
+from fastapi.responses import HTMLResponse
+import uvicorn  # HTMLを返すためのレスポンスクラス
 
 # FastAPIアプリケーションのインスタンスを作成
 app = FastAPI()
@@ -55,8 +57,15 @@ class TodoResponse(Todo):
     id: int  # TODOのID
 
 
+# クライアント用のHTMLを返すエンドポイント
+@app.get("/", response_class=HTMLResponse)
+def read_root():
+    with open("client.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+
 # 新規TODOを作成するエンドポイント
-@app.post("/todos", response_model=TodoResponse)
+@app.post("/todo-form", response_model=TodoResponse)
 def create_todo(todo: Todo):
     with sqlite3.connect("todos.db") as conn:
         cursor = conn.execute(
@@ -69,7 +78,7 @@ def create_todo(todo: Todo):
 
 
 # 全てのTODOを取得するエンドポイント
-@app.get("/todos")
+@app.get("/todo-form")
 def get_todos():
     with sqlite3.connect("todos.db") as conn:
         todos = conn.execute("SELECT * FROM todos").fetchall()  # 全てのTODOを取得
@@ -78,7 +87,7 @@ def get_todos():
 
 
 # 指定されたIDのTODOを取得するエンドポイント
-@app.get("/todos/{todo_id}")
+@app.get("/renderQuestions/{todo_id}")
 def get_todo(todo_id: int):
     with sqlite3.connect("todos.db") as conn:
         # 指定されたIDのTODOを検索
@@ -89,7 +98,7 @@ def get_todo(todo_id: int):
 
 
 # 指定されたIDのTODOを更新するエンドポイント
-@app.put("/todos/{todo_id}")
+@app.put("/renderQuestions/{todo_id}")
 def update_todo(todo_id: int, todo: Todo):
     with sqlite3.connect("todos.db") as conn:
         # タイトルと完了状態を更新
@@ -103,7 +112,7 @@ def update_todo(todo_id: int, todo: Todo):
 
 
 # 指定されたIDのTODOを削除するエンドポイント
-@app.delete("/todos/{todo_id}")
+@app.delete("/renderQuestions/{todo_id}")
 def delete_todo(todo_id: int):
     with sqlite3.connect("todos.db") as conn:
         # 指定されたIDのTODOを削除
@@ -111,3 +120,7 @@ def delete_todo(todo_id: int):
         if cursor.rowcount == 0:  # 削除対象のTODOが存在しない場合は404エラーを返す
             raise HTTPException(status_code=404, detail="Todo not found")
         return {"message": "Todo deleted"}
+
+if __name__ == "__main__":
+    # FastAPIアプリケーションを非同期モードで起動
+    uvicorn.run(app, host="0.0.0.0", port=8000)
