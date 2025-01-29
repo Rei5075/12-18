@@ -7,11 +7,10 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            line-height: 1.6;
+            text-align: center;
             margin: 20px;
         }
         h1 {
-            text-align: center;
             color: #333;
         }
         .todo-form {
@@ -19,48 +18,100 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: 10px;
         }
-        .todo-form input, .todo-form textarea {
-            width: 70%;
+        select, input, textarea, button {
+            width: 80%;
             padding: 10px;
-            margin-bottom: 10px;
             border: 1px solid #ccc;
             border-radius: 5px;
+            font-size: 16px;
         }
-        .todo-form button {
-            padding: 10px 20px;
+        button {
             background-color: #007BFF;
             color: white;
-            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .question-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: left;
+            position: relative;
+            border-left: 5px solid #007BFF;
+        }
+        .question-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .option {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f0f0f0;
             border-radius: 5px;
             cursor: pointer;
-        }
-        .todo-form button:hover {
-            background-color: #0056b3;
-        }
-        .search-bar {
-            margin: 20px;
+            transition: background 0.3s;
             text-align: center;
+            font-weight: bold;
         }
-        .search-bar input {
-            width: 70%;
-            padding: 10px;
-            border: 1px solid #ccc;
+        .option:hover {
+            background: #ddd;
+        }
+        .option.locked {
+            pointer-events: none;
+        }
+        .correct {
+            background-color: lightgreen !important;
+        }
+        .incorrect {
+            background-color: lightcoral !important;
+        }
+        .answer {
+            display: none;
+            font-weight: bold;
+            color: red;
+            margin-top: 10px;
+        }
+        .toggle-btn, .retry-btn {
+            background: #ff9800;
+            color: white;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            font-size: 14px;
             border-radius: 5px;
+            margin-top: 5px;
         }
-        ul {
-            list-style: none;
+        .toggle-btn:hover, .retry-btn:hover {
+            background: #e68900;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 18px;
+            height: 18px;
+            background: red;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 18px;
             padding: 0;
         }
-        li {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        li span {
-            display: block;
-        }
-        .question-category {
-            font-weight: bold;
+        .delete-btn:hover {
+            background: darkred;
         }
     </style>
 </head>
@@ -68,27 +119,31 @@
     <h1>ITパスポート問題作成TODOリスト</h1>
 
     <div class="todo-form">
-        <input type="text" id="questionCategory" placeholder="カテゴリ (例: ストラテジ系)" required>
+        <select id="questionCategory">
+            <option value="ストラテジ系">ストラテジ系</option>
+            <option value="マネジメント系">マネジメント系</option>
+            <option value="テクノロジ系">テクノロジ系</option>
+        </select>
         <textarea id="questionContent" placeholder="問題内容" rows="3" required></textarea>
         <input type="text" id="option1" placeholder="選択肢1" required>
         <input type="text" id="option2" placeholder="選択肢2" required>
         <input type="text" id="option3" placeholder="選択肢3" required>
         <input type="text" id="option4" placeholder="選択肢4" required>
         <input type="number" id="correctAnswer" placeholder="正解番号 (1-4)" min="1" max="4" required>
-        <button type="submit">問題を追加</button>
-    </div>
-
-    <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="問題を検索..." onkeyup="searchQuestions()">
+        <button id="addButton" onclick="addQuestion()">問題を追加</button>
     </div>
 
     <ul id="questionList"></ul>
 
     <script>
-        const questions = [];
+        let questions = JSON.parse(localStorage.getItem('questions')) || [];
+
+        function saveQuestions() {
+            localStorage.setItem('questions', JSON.stringify(questions));
+        }
 
         function addQuestion() {
-            const category = document.getElementById('questionCategory').value.trim();
+            const category = document.getElementById('questionCategory').value;
             const content = document.getElementById('questionContent').value.trim();
             const options = [
                 document.getElementById('option1').value.trim(),
@@ -98,92 +153,64 @@
             ];
             const correct = parseInt(document.getElementById('correctAnswer').value.trim(), 10);
 
-            if (!category || !content || options.some(option => !option) || isNaN(correct) || correct < 1 || correct > 4) {
-                alert('すべての項目を正しく入力してください。');
-                return;
-            }
-
-            const question = { category, content, options, correct };
-            questions.push(question);
+            questions.push({ category, content, options, correct });
+            saveQuestions();
             renderQuestions();
-
-            // サーバーへデータを送信
-        try {
-            const response = await fetch("http://localhost:8000/save-question", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(question),
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                console.log("サーバーに保存しました:", result);
-            } else {
-                console.error("サーバーでエラーが発生しました:", response.statusText);
-            }
-        } catch (error) {
-            console.error("通信エラー:", error);
-        }
-
-            document.getElementById('questionCategory').value = '';
-            document.getElementById('questionContent').value = '';
-            document.getElementById('option1').value = '';
-            document.getElementById('option2').value = '';
-            document.getElementById('option3').value = '';
-            document.getElementById('option4').value = '';
-            document.getElementById('correctAnswer').value = '';
+            document.querySelectorAll('.todo-form input, .todo-form textarea').forEach(input => input.value = '');
         }
 
         function renderQuestions() {
             const list = document.getElementById('questionList');
             list.innerHTML = '';
-            questions.forEach((question, index) => {
+            questions.forEach((q, index) => {
                 const li = document.createElement('li');
+                li.className = 'question-item';
                 li.innerHTML = `
-                    <span class="question-category">カテゴリ: ${question.category}</span>
-                    <span>問題: ${question.content}</span>
-                    <span>選択肢:</span>
-                    <ul>
-                        <li>1. ${question.options[0]}</li>
-                        <li>2. ${question.options[1]}</li>
-                        <li>3. ${question.options[2]}</li>
-                        <li>4. ${question.options[3]}</li>
-                    </ul>
-                    <span>正解: ${question.correct}</span>
+                    <button class="delete-btn" onclick="deleteQuestion(${index})">×</button>
+                    <strong>${q.category}</strong>
+                    <p>${q.content}</p>
+                    <div id="options-${index}">
+                        ${q.options.map((option, i) => 
+                            `<div class="option" onclick="checkAnswer(${index}, ${i + 1}, this)">${option}</div>`
+                        ).join('')}
+                    </div>
+                    <button class="toggle-btn" onclick="toggleAnswer(${index})">正解を見る</button>
+                    <button class="retry-btn" onclick="retryQuestion(${index})">もう一度挑戦</button>
+                    <p id="answer-${index}" class="answer">正解: ${q.correct}</p>
+                    <p id="result-${index}" class="result"></p>
                 `;
                 list.appendChild(li);
             });
         }
 
-        function searchQuestions() {
-            const query = document.getElementById('searchInput').value.trim().toLowerCase();
-            const filteredQuestions = questions.filter(q => 
-                q.category.toLowerCase().includes(query) || 
-                q.content.toLowerCase().includes(query) || 
-                q.options.some(option => option.toLowerCase().includes(query))
-            );
-
-            const list = document.getElementById('questionList');
-            list.innerHTML = '';
-            filteredQuestions.forEach((question, index) => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <span class="question-category">カテゴリ: ${question.category}</span>
-                    <span>問題: ${question.content}</span>
-                    <span>選択肢:</span>
-                    <ul>
-                        <li>1. ${question.options[0]}</li>
-                        <li>2. ${question.options[1]}</li>
-                        <li>3. ${question.options[2]}</li>
-                        <li>4. ${question.options[3]}</li>
-                    </ul>
-                    <span>正解: ${question.correct}</span>
-                `;
-                list.appendChild(li);
-            });
+        function deleteQuestion(index) {
+            questions.splice(index, 1);
+            saveQuestions();
+            renderQuestions();
         }
+
+        function checkAnswer(index, selected, element) {
+            document.querySelectorAll(`#options-${index} .option`).forEach(opt => opt.classList.add('locked'));
+            if (selected === questions[index].correct) {
+                element.classList.add('correct');
+                document.getElementById(`result-${index}`).textContent = "✅ 正解！";
+            } else {
+                element.classList.add('incorrect');
+                document.getElementById(`result-${index}`).textContent = "❌ 不正解";
+            }
+        }
+
+        function toggleAnswer(index) {
+            const answer = document.getElementById(`answer-${index}`);
+            answer.style.display = answer.style.display === "none" || answer.style.display === "" ? "block" : "none";
+        }
+
+        function retryQuestion(index) {
+            document.querySelectorAll(`#options-${index} .option`).forEach(opt => opt.classList.remove('correct', 'incorrect', 'locked'));
+            document.getElementById(`result-${index}`).innerText = "";
+        }
+
+        renderQuestions();
     </script>
 </body>
 </html>

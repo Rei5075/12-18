@@ -30,20 +30,22 @@ app.add_middleware(
 
 # データベース初期化
 def init_db():
-    conn = sqlite3.connect("todos.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS questions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT,
-            content TEXT,
-            options TEXT,
-            correct INTEGER
+    # SQLiteデータベースに接続（ファイルが存在しない場合は新規作成）
+    with sqlite3.connect("todos.db") as conn:
+        # TODOを保存するテーブルを作成（すでに存在する場合は作成しない）
+        # 自動増分する一意のID（INTEGER PRIMARY KEY AUTOINCREMENT）
+        # TODOのタイトル（TEXT NOT NULL）
+        # 完了状態（BOOLEAN DEFAULT FALSE）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS todos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                completed BOOLEAN DEFAULT FALSE
+            )
+        """
         )
-    """)
-    conn.commit()
-    conn.close()
-
+        
 init_db()
 
 
